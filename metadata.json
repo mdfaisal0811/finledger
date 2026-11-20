@@ -1,0 +1,6 @@
+{
+  "name": "FinLedger",
+  "description": "Personal finance and expense tracker with multi-account management, atomic transfers, credit card billing, lending/borrowing, budgets, and financial reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

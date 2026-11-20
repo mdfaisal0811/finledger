@@ -1,0 +1,409 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isNum(v) {
+      return v is int || v is float;
+    }
+
+    function isOptStr(data, key, maxLen) {
+      return !(key in data) || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isOptInt(data, key) {
+      return !(key in data) || data[key] is int;
+    }
+
+    function isValidThresholds(listVal) {
+      return listVal is list && listVal.size() <= 6 && (listVal.size() == 0 || listVal[0] is int);
+    }
+
+    // Validation helpers
+    function isValidUserSettings(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             isOptStr(data, 'email', 120) &&
+             isOptStr(data, 'photoUrl', 500) &&
+             data.currencyCode is string && data.currencyCode.size() >= 1 && data.currencyCode.size() <= 10 &&
+             data.currencySymbol is string && data.currencySymbol.size() >= 1 && data.currencySymbol.size() <= 6 &&
+             data.themeMode in ['LIGHT', 'DARK', 'SYSTEM'] &&
+             data.dateFormat is string && data.dateFormat.size() >= 4 && data.dateFormat.size() <= 30 &&
+             data.language is string && data.language.size() >= 2 && data.language.size() <= 30 &&
+             isOptStr(data, 'defaultAccountId', 128) &&
+             data.notificationsEnabled is bool &&
+             isValidThresholds(data.budgetAlertThresholds) &&
+             data.dueDateReminderDays is int && data.dueDateReminderDays >= 0 && data.dueDateReminderDays <= 30 &&
+             data.appLockEnabled is bool &&
+             data.hideBalances is bool;
+    }
+
+    function isValidAccount(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 60 &&
+             data.type in ['CASH', 'BANK', 'MOBILE_WALLET', 'CREDIT_CARD', 'SAVINGS', 'OTHER'] &&
+             isNum(data.openingBalance) &&
+             isNum(data.currentBalance) &&
+             isNum(data.creditLimit) && data.creditLimit >= 0 &&
+             isOptStr(data, 'bankName', 60) &&
+             isOptStr(data, 'accountNumber', 40) &&
+             data.billingCycleDay is int && data.billingCycleDay >= 1 && data.billingCycleDay <= 31 &&
+             data.paymentDueDay is int && data.paymentDueDay >= 1 && data.paymentDueDay <= 31 &&
+             isNum(data.minimumPayment) && data.minimumPayment >= 0 &&
+             data.iconKey is string && data.iconKey.size() >= 1 && data.iconKey.size() <= 40 &&
+             data.colorHex is int &&
+             isOptStr(data, 'notes', 500) &&
+             data.archived is bool &&
+             data.defaultAccount is bool;
+    }
+
+    function isValidCategory(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 50 &&
+             data.type in ['INCOME', 'EXPENSE'] &&
+             data.iconKey is string && data.iconKey.size() >= 1 && data.iconKey.size() <= 40 &&
+             data.colorHex is int &&
+             data.systemDefault is bool;
+    }
+
+    function isValidTransaction(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.type in ['INCOME', 'EXPENSE', 'TRANSFER', 'CREDIT_CARD_PAYMENT', 'LENDING', 'BORROWING', 'LENT_REPAYMENT', 'BORROWED_REPAYMENT'] &&
+             isNum(data.amount) && data.amount > 0 &&
+             isNum(data.chargeAmount) && data.chargeAmount >= 0 &&
+             isValidId(data.accountId) &&
+             data.accountName is string && data.accountName.size() >= 1 && data.accountName.size() <= 60 &&
+             isOptStr(data, 'toAccountId', 128) &&
+             isOptStr(data, 'toAccountName', 60) &&
+             (!(data.type in ['TRANSFER', 'CREDIT_CARD_PAYMENT']) || (data.toAccountId is string && isValidId(data.toAccountId) && data.toAccountId != data.accountId)) &&
+             isOptStr(data, 'categoryId', 128) &&
+             isOptStr(data, 'categoryName', 50) &&
+             data.description is string && data.description.size() <= 120 &&
+             isOptStr(data, 'notes', 500) &&
+             isOptStr(data, 'receiptUri', 600) &&
+             isOptStr(data, 'loanId', 128) &&
+             isOptStr(data, 'repaymentId', 128) &&
+             isOptStr(data, 'counterpartyName', 80) &&
+             data.occurredAtMillis is int && data.occurredAtMillis > 0;
+    }
+
+    function isValidBudget(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 60 &&
+             data.periodType in ['WEEKLY', 'MONTHLY', 'CUSTOM'] &&
+             isOptStr(data, 'categoryId', 128) &&
+             isOptStr(data, 'categoryName', 50) &&
+             isNum(data.limitAmount) && data.limitAmount > 0 &&
+             data.startDateMillis is int && data.startDateMillis >= 0 &&
+             data.endDateMillis is int && data.endDateMillis >= data.startDateMillis &&
+             isValidThresholds(data.alertThresholds) &&
+             data.lastNotifiedThreshold is int && data.lastNotifiedThreshold >= 0 && data.lastNotifiedThreshold <= 100 &&
+             data.active is bool;
+    }
+
+    function isValidLending(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.personName is string && data.personName.size() >= 1 && data.personName.size() <= 80 &&
+             isNum(data.principalAmount) && data.principalAmount > 0 &&
+             isNum(data.returnedAmount) && data.returnedAmount >= 0 && data.returnedAmount <= data.principalAmount + 0.0001 &&
+             isValidId(data.accountId) &&
+             data.accountName is string && data.accountName.size() >= 1 && data.accountName.size() <= 60 &&
+             isValidId(data.transactionId) &&
+             data.lentDateMillis is int && data.lentDateMillis > 0 &&
+             isOptInt(data, 'expectedReturnDateMillis') &&
+             data.description is string && data.description.size() <= 120 &&
+             isOptStr(data, 'notes', 500) &&
+             data.status in ['OPEN', 'PARTIAL', 'SETTLED'] &&
+             data.reminderEnabled is bool;
+    }
+
+    function isValidBorrowing(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.personName is string && data.personName.size() >= 1 && data.personName.size() <= 80 &&
+             isNum(data.principalAmount) && data.principalAmount > 0 &&
+             isNum(data.repaidAmount) && data.repaidAmount >= 0 && data.repaidAmount <= data.principalAmount + 0.0001 &&
+             isValidId(data.accountId) &&
+             data.accountName is string && data.accountName.size() >= 1 && data.accountName.size() <= 60 &&
+             isValidId(data.transactionId) &&
+             data.borrowedDateMillis is int && data.borrowedDateMillis > 0 &&
+             isOptInt(data, 'expectedRepaymentDateMillis') &&
+             data.description is string && data.description.size() <= 120 &&
+             isOptStr(data, 'notes', 500) &&
+             data.status in ['OPEN', 'PARTIAL', 'SETTLED'] &&
+             data.reminderEnabled is bool;
+    }
+
+    function isValidRepayment(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.recordType in ['LENDING', 'BORROWING'] &&
+             isValidId(data.loanId) &&
+             data.personName is string && data.personName.size() >= 1 && data.personName.size() <= 80 &&
+             isNum(data.amount) && data.amount > 0 &&
+             isValidId(data.accountId) &&
+             data.accountName is string && data.accountName.size() >= 1 && data.accountName.size() <= 60 &&
+             isValidId(data.transactionId) &&
+             data.repaidAtMillis is int && data.repaidAtMillis > 0 &&
+             isOptStr(data, 'notes', 500);
+    }
+
+    function isValidNotification(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.message is string && data.message.size() >= 1 && data.message.size() <= 300 &&
+             data.kind in ['BUDGET_THRESHOLD', 'LOAN_DUE', 'CARD_DUE', 'SYSTEM'] &&
+             isOptStr(data, 'relatedId', 128) &&
+             data.read is bool &&
+             data.triggeredAtMillis is int && data.triggeredAtMillis > 0;
+    }
+
+    function isValidTransactionImage(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             isValidId(data.transactionId) &&
+             data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 160 &&
+             data.fileType in ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'] &&
+             data.storageRefPath is string && data.storageRefPath.size() >= 1 && data.storageRefPath.size() <= 300 &&
+             isOptStr(data, 'downloadUrl', 1000) &&
+             isOptStr(data, 'localFilePath', 400) &&
+             data.fileSizeBytes is int && data.fileSizeBytes > 0 && data.fileSizeBytes <= 10485760 &&
+             data.uploadedAtMillis is int && data.uploadedAtMillis > 0;
+    }
+
+    // User profile & settings
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'currencyCode', 'currencySymbol', 'themeMode', 'dateFormat', 'language', 'notificationsEnabled', 'budgetAlertThresholds', 'dueDateReminderDays', 'appLockEnabled', 'hideBalances', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'currencyCode', 'currencySymbol', 'themeMode', 'dateFormat', 'language', 'defaultAccountId', 'notificationsEnabled', 'budgetAlertThresholds', 'dueDateReminderDays', 'appLockEnabled', 'hideBalances', 'createdAt', 'updatedAt']) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidUserSettings(incoming());
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserSettings(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'currencyCode', 'currencySymbol', 'themeMode', 'dateFormat', 'language', 'defaultAccountId', 'notificationsEnabled', 'budgetAlertThresholds', 'dueDateReminderDays', 'appLockEnabled', 'hideBalances', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // Accounts subcollection
+      match /accounts/{accountId} {
+        allow get: if isOwner(userId) && isValidId(accountId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(accountId) &&
+                         incoming().keys().hasAll(['userId', 'name', 'type', 'openingBalance', 'currentBalance', 'creditLimit', 'billingCycleDay', 'paymentDueDay', 'minimumPayment', 'iconKey', 'colorHex', 'archived', 'defaultAccount', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'type', 'openingBalance', 'currentBalance', 'creditLimit', 'bankName', 'accountNumber', 'billingCycleDay', 'paymentDueDay', 'minimumPayment', 'iconKey', 'colorHex', 'notes', 'archived', 'defaultAccount', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidAccount(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(accountId) &&
+                         isValidAccount(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'type', 'openingBalance', 'currentBalance', 'creditLimit', 'bankName', 'accountNumber', 'billingCycleDay', 'paymentDueDay', 'minimumPayment', 'iconKey', 'colorHex', 'notes', 'archived', 'defaultAccount', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(accountId);
+      }
+
+      // Categories subcollection
+      match /categories/{categoryId} {
+        allow get: if isOwner(userId) && isValidId(categoryId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(categoryId) &&
+                         incoming().keys().hasAll(['userId', 'name', 'type', 'iconKey', 'colorHex', 'systemDefault', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'type', 'iconKey', 'colorHex', 'systemDefault', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidCategory(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(categoryId) &&
+                         isValidCategory(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'type', 'iconKey', 'colorHex', 'systemDefault', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(categoryId);
+      }
+
+      // Transactions subcollection
+      match /transactions/{transactionId} {
+        allow get: if isOwner(userId) && isValidId(transactionId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(transactionId) &&
+                         incoming().keys().hasAll(['userId', 'type', 'amount', 'chargeAmount', 'accountId', 'accountName', 'description', 'occurredAtMillis', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'type', 'amount', 'chargeAmount', 'accountId', 'accountName', 'toAccountId', 'toAccountName', 'categoryId', 'categoryName', 'description', 'notes', 'receiptUri', 'loanId', 'repaymentId', 'counterpartyName', 'occurredAtMillis', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidTransaction(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(transactionId) &&
+                         isValidTransaction(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['type', 'amount', 'chargeAmount', 'accountId', 'accountName', 'toAccountId', 'toAccountName', 'categoryId', 'categoryName', 'description', 'notes', 'receiptUri', 'loanId', 'repaymentId', 'counterpartyName', 'occurredAtMillis', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(transactionId);
+      }
+
+      // Budgets subcollection
+      match /budgets/{budgetId} {
+        allow get: if isOwner(userId) && isValidId(budgetId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(budgetId) &&
+                         incoming().keys().hasAll(['userId', 'name', 'periodType', 'limitAmount', 'startDateMillis', 'endDateMillis', 'alertThresholds', 'lastNotifiedThreshold', 'active', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'periodType', 'categoryId', 'categoryName', 'limitAmount', 'startDateMillis', 'endDateMillis', 'alertThresholds', 'lastNotifiedThreshold', 'active', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidBudget(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(budgetId) &&
+                         isValidBudget(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'periodType', 'categoryId', 'categoryName', 'limitAmount', 'startDateMillis', 'endDateMillis', 'alertThresholds', 'lastNotifiedThreshold', 'active', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(budgetId);
+      }
+
+      // Lending records subcollection
+      match /lending_records/{recordId} {
+        allow get: if isOwner(userId) && isValidId(recordId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(recordId) &&
+                         incoming().keys().hasAll(['userId', 'personName', 'principalAmount', 'returnedAmount', 'accountId', 'accountName', 'transactionId', 'lentDateMillis', 'description', 'status', 'reminderEnabled', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'personName', 'principalAmount', 'returnedAmount', 'accountId', 'accountName', 'transactionId', 'lentDateMillis', 'expectedReturnDateMillis', 'description', 'notes', 'status', 'reminderEnabled', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidLending(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(recordId) &&
+                         isValidLending(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['personName', 'principalAmount', 'returnedAmount', 'accountId', 'accountName', 'transactionId', 'lentDateMillis', 'expectedReturnDateMillis', 'description', 'notes', 'status', 'reminderEnabled', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(recordId);
+      }
+
+      // Borrowing records subcollection
+      match /borrowing_records/{recordId} {
+        allow get: if isOwner(userId) && isValidId(recordId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(recordId) &&
+                         incoming().keys().hasAll(['userId', 'personName', 'principalAmount', 'repaidAmount', 'accountId', 'accountName', 'transactionId', 'borrowedDateMillis', 'description', 'status', 'reminderEnabled', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'personName', 'principalAmount', 'repaidAmount', 'accountId', 'accountName', 'transactionId', 'borrowedDateMillis', 'expectedRepaymentDateMillis', 'description', 'notes', 'status', 'reminderEnabled', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidBorrowing(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(recordId) &&
+                         isValidBorrowing(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['personName', 'principalAmount', 'repaidAmount', 'accountId', 'accountName', 'transactionId', 'borrowedDateMillis', 'expectedRepaymentDateMillis', 'description', 'notes', 'status', 'reminderEnabled', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(recordId);
+      }
+
+      // Repayments subcollection
+      match /repayments/{repaymentId} {
+        allow get: if isOwner(userId) && isValidId(repaymentId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(repaymentId) &&
+                         incoming().keys().hasAll(['userId', 'recordType', 'loanId', 'personName', 'amount', 'accountId', 'accountName', 'transactionId', 'repaidAtMillis', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'recordType', 'loanId', 'personName', 'amount', 'accountId', 'accountName', 'transactionId', 'repaidAtMillis', 'notes', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidRepayment(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(repaymentId) &&
+                         isValidRepayment(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['recordType', 'loanId', 'personName', 'amount', 'accountId', 'accountName', 'transactionId', 'repaidAtMillis', 'notes', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(repaymentId);
+      }
+
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        allow get: if isOwner(userId) && isValidId(notificationId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(notificationId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'message', 'kind', 'read', 'triggeredAtMillis', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'message', 'kind', 'relatedId', 'read', 'triggeredAtMillis', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidNotification(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(notificationId) &&
+                         isValidNotification(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'message', 'kind', 'relatedId', 'read', 'triggeredAtMillis', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(notificationId);
+      }
+
+      // Transaction receipt/bill image metadata subcollection
+      match /transaction_images/{imageId} {
+        allow get: if isOwner(userId) && isValidId(imageId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(imageId) &&
+                         incoming().keys().hasAll(['userId', 'transactionId', 'fileName', 'fileType', 'storageRefPath', 'fileSizeBytes', 'uploadedAtMillis', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'transactionId', 'fileName', 'fileType', 'storageRefPath', 'downloadUrl', 'localFilePath', 'fileSizeBytes', 'uploadedAtMillis', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidTransactionImage(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(imageId) &&
+                         isValidTransactionImage(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['transactionId', 'fileName', 'fileType', 'storageRefPath', 'downloadUrl', 'localFilePath', 'fileSizeBytes', 'uploadedAtMillis', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(imageId);
+      }
+    }
+  }
+}

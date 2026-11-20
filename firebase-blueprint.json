@@ -1,0 +1,263 @@
+{
+  "entities": {
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "Authenticated user profile and application preferences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "currencyCode": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "themeMode": { "type": "string", "enum": ["LIGHT", "DARK", "SYSTEM"] },
+        "dateFormat": { "type": "string" },
+        "language": { "type": "string" },
+        "defaultAccountId": { "type": "string" },
+        "notificationsEnabled": { "type": "boolean" },
+        "budgetAlertThresholds": { "type": "array" },
+        "dueDateReminderDays": { "type": "integer" },
+        "appLockEnabled": { "type": "boolean" },
+        "hideBalances": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["userId", "displayName", "currencyCode", "currencySymbol", "themeMode", "dateFormat", "language", "notificationsEnabled", "budgetAlertThresholds", "dueDateReminderDays", "appLockEnabled", "hideBalances", "createdAt", "updatedAt"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Financial account including Cash, Bank, Mobile Wallet, Credit Card, Savings, and Other.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["CASH", "BANK", "MOBILE_WALLET", "CREDIT_CARD", "SAVINGS", "OTHER"] },
+        "openingBalance": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "creditLimit": { "type": "number" },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "billingCycleDay": { "type": "integer" },
+        "paymentDueDay": { "type": "integer" },
+        "minimumPayment": { "type": "number" },
+        "iconKey": { "type": "string" },
+        "colorHex": { "type": "integer" },
+        "notes": { "type": "string" },
+        "archived": { "type": "boolean" },
+        "defaultAccount": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "type", "openingBalance", "currentBalance", "creditLimit", "billingCycleDay", "paymentDueDay", "minimumPayment", "iconKey", "colorHex", "archived", "defaultAccount", "createdAt", "updatedAt"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Income or expense category.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["INCOME", "EXPENSE"] },
+        "iconKey": { "type": "string" },
+        "colorHex": { "type": "integer" },
+        "systemDefault": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "type", "iconKey", "colorHex", "systemDefault", "createdAt", "updatedAt"]
+    },
+    "TransactionRecord": {
+      "title": "TransactionRecord",
+      "description": "Unified financial transaction record including linked transfer and transfer charge.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["INCOME", "EXPENSE", "TRANSFER", "CREDIT_CARD_PAYMENT", "LENDING", "BORROWING", "LENT_REPAYMENT", "BORROWED_REPAYMENT"] },
+        "amount": { "type": "number" },
+        "chargeAmount": { "type": "number" },
+        "accountId": { "type": "string" },
+        "accountName": { "type": "string" },
+        "toAccountId": { "type": "string" },
+        "toAccountName": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "description": { "type": "string" },
+        "notes": { "type": "string" },
+        "receiptUri": { "type": "string" },
+        "loanId": { "type": "string" },
+        "repaymentId": { "type": "string" },
+        "counterpartyName": { "type": "string" },
+        "occurredAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "chargeAmount", "accountId", "accountName", "description", "occurredAtMillis", "createdAt", "updatedAt"]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Overall or category-wise budget.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "periodType": { "type": "string", "enum": ["WEEKLY", "MONTHLY", "CUSTOM"] },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "limitAmount": { "type": "number" },
+        "startDateMillis": { "type": "integer" },
+        "endDateMillis": { "type": "integer" },
+        "alertThresholds": { "type": "array" },
+        "lastNotifiedThreshold": { "type": "integer" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "periodType", "limitAmount", "startDateMillis", "endDateMillis", "alertThresholds", "lastNotifiedThreshold", "active", "createdAt", "updatedAt"]
+    },
+    "LendingRecord": {
+      "title": "LendingRecord",
+      "description": "Money lent to another person.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "personName": { "type": "string" },
+        "principalAmount": { "type": "number" },
+        "returnedAmount": { "type": "number" },
+        "accountId": { "type": "string" },
+        "accountName": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "lentDateMillis": { "type": "integer" },
+        "expectedReturnDateMillis": { "type": "integer" },
+        "description": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["OPEN", "PARTIAL", "SETTLED"] },
+        "reminderEnabled": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "personName", "principalAmount", "returnedAmount", "accountId", "accountName", "transactionId", "lentDateMillis", "description", "status", "reminderEnabled", "createdAt", "updatedAt"]
+    },
+    "BorrowingRecord": {
+      "title": "BorrowingRecord",
+      "description": "Money borrowed from another person.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "personName": { "type": "string" },
+        "principalAmount": { "type": "number" },
+        "repaidAmount": { "type": "number" },
+        "accountId": { "type": "string" },
+        "accountName": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "borrowedDateMillis": { "type": "integer" },
+        "expectedRepaymentDateMillis": { "type": "integer" },
+        "description": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["OPEN", "PARTIAL", "SETTLED"] },
+        "reminderEnabled": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "personName", "principalAmount", "repaidAmount", "accountId", "accountName", "transactionId", "borrowedDateMillis", "description", "status", "reminderEnabled", "createdAt", "updatedAt"]
+    },
+    "RepaymentRecord": {
+      "title": "RepaymentRecord",
+      "description": "Partial or full repayment for lending or borrowing.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "recordType": { "type": "string", "enum": ["LENDING", "BORROWING"] },
+        "loanId": { "type": "string" },
+        "personName": { "type": "string" },
+        "amount": { "type": "number" },
+        "accountId": { "type": "string" },
+        "accountName": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "repaidAtMillis": { "type": "integer" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "recordType", "loanId", "personName", "amount", "accountId", "accountName", "transactionId", "repaidAtMillis", "createdAt", "updatedAt"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Budget warning or due-date reminder notification.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "kind": { "type": "string", "enum": ["BUDGET_THRESHOLD", "LOAN_DUE", "CARD_DUE", "SYSTEM"] },
+        "relatedId": { "type": "string" },
+        "read": { "type": "boolean" },
+        "triggeredAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "message", "kind", "read", "triggeredAtMillis", "createdAt", "updatedAt"]
+    },
+    "TransactionImage": {
+      "title": "TransactionImage",
+      "description": "Metadata for receipt or bill images attached to any financial transaction.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string", "enum": ["image/jpeg", "image/jpg", "image/png", "image/webp"] },
+        "storageRefPath": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "localFilePath": { "type": "string" },
+        "fileSizeBytes": { "type": "integer" },
+        "uploadedAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "transactionId", "fileName", "fileType", "storageRefPath", "fileSizeBytes", "uploadedAtMillis", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "User profile and workspace settings."
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/Account" },
+      "description": "User financial accounts."
+    },
+    "/users/{userId}/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "User income and expense categories."
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/TransactionRecord" },
+      "description": "User financial ledger transactions."
+    },
+    "/users/{userId}/budgets/{budgetId}": {
+      "schema": { "$ref": "#/entities/Budget" },
+      "description": "User budgets and alert thresholds."
+    },
+    "/users/{userId}/lending_records/{recordId}": {
+      "schema": { "$ref": "#/entities/LendingRecord" },
+      "description": "Money lent records."
+    },
+    "/users/{userId}/borrowing_records/{recordId}": {
+      "schema": { "$ref": "#/entities/BorrowingRecord" },
+      "description": "Money borrowed records."
+    },
+    "/users/{userId}/repayments/{repaymentId}": {
+      "schema": { "$ref": "#/entities/RepaymentRecord" },
+      "description": "Repayment history records."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "In-app notifications."
+    },
+    "/users/{userId}/transaction_images/{imageId}": {
+      "schema": { "$ref": "#/entities/TransactionImage" },
+      "description": "Receipt and bill image attachments linked to transactions."
+    }
+  }
+}
